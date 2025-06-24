@@ -1,5 +1,7 @@
 .env
 venv
+tests/fixtures/*.jpg
+tests/fixtures/*.png
 
 # Python cache
 __pycache__/
