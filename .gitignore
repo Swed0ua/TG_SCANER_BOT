@@ -1,0 +1,18 @@
+.env
+venv
+
+# Python cache
+__pycache__/
+/.pytest_cache/
+*.pyc
+*.pyo
+
+# IDE/Editor files
+.vscode/
+.idea/
+
+*.tmp
+*.swp
+*.bak
+.DS_Store
+Thumbs.db
