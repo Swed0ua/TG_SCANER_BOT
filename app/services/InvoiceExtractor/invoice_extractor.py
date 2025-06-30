@@ -9,38 +9,43 @@ class InvoiceExtractor:
 
     def extract_invoice(self, image_path: str) -> dict:
         text = self.ocr.extract_text(image_path)
-        # prompt = (
-        #     "Extract invoice data from the following text strictly in this JSON format:\n"
-        #     "{"
-        #     "\"number\": \"\", \"date\": \"\", \"supplier\": {\"name\": \"\", \"edrpou\": \"\", \"iban\": \"\", \"address\": \"\"}, "
-        #     "\"buyer\": {\"name\": \"\", \"address\": \"\"}, \"items\": [{\"name\": \"\", \"quantity\": 0, \"unit\": \"\", \"price\": 0, \"total\": 0}], "
-        #     "\"total\": 0, \"vat\": 0, \"city\": \"\""
-        #     "}\n"
-        #     "Invoice text:\n"
-        #     f"{text}\n"
-        #     "IMPORTANT: Return ONLY valid JSON. Do NOT add any code block markers, explanations, or comments. The response MUST be ONLY pure JSON."
-        # )
+
         prompt = (
-            "Extract invoice data from the following text strictly in this JSON format:\n"
-            "{"
-            "\"number\": \"\", "
-            "\"date\": \"\", "
-            "\"supplier\": {\"name\": \"\", \"edrpou\": \"\", \"iban\": \"\", \"address\": \"\"}, "
-            "\"buyer\": {\"name\": \"\", \"address\": \"\"}, "
-            "\"contract\": \"\", "
-            "\"items\": [{\"name\": \"\", \"quantity\": 0, \"unit\": \"\", \"price\": 0, \"total\": 0}], "
-            "\"total\": 0, "
-            "\"vat\": 0, "
-            "\"city\": \"\", "
-            "\"responsible_person\": \"\", "
-            "\"recipient\": \"\""
-            "}\n"
-            "If any field is missing or not found in the text, set its value to null.\n"
+            "Extract all invoice data from the following text strictly in this JSON format:\n"
+            "{\n"
+            "\"number\": \"\", \n"
+            "\"date\": \"\", \n"
+            "\"supplier\": {\"name\": \"\", \"edrpou\": \"\", \"iban\": \"\", \"address\": \"\"}, \n"
+            "\"buyer\": {\"name\": \"\", \"address\": \"\"}, \n"
+            "\"contract\": \"\", \n"
+            "\"items\": [\n"
+            "    {\"name\": \"\", \"quantity\": 0, \"unit\": \"\", \"price\": 0, \"total\": 0}\n"
+            "], \n"
+            "\"total\": 0, \n"
+            "\"vat\": 0, \n"
+            "\"city\": \"\", \n"
+            "\"responsible_person\": \"\", \n"
+            "\"recipient\": \"\"\n"
+            "}\n\n"
+            "💡 Notes:\n"
+            "- Always extract full list of items from the invoice. DO NOT leave `items` as [null].\n"
+            "- Each item must contain:\n"
+            "  * `name`: name of the product or service\n"
+            "  * `quantity`: numerical amount\n"
+            "  * `unit`: unit of measure (e.g., 'шт', 'kg')\n"
+            "  * `price`: unit price including VAT\n"
+            "  * `total`: total cost for this item (quantity × price)\n"
+            "- If the unit is not clearly mentioned, default to `\"шт\"`.\n"
+            "- Extract values exactly as shown in the invoice text.\n"
+            "- Do NOT include subtotals, totals or any row that is not an actual product or service.\n"
+            "- If a field is completely missing in the invoice, set it to `null`.\n\n"
             "Invoice text:\n"
             f"{text}\n"
-            "IMPORTANT: Return ONLY valid JSON. Do NOT add any code block markers, explanations, or comments. The response MUST be ONLY pure JSON."
+            "Return ONLY valid JSON. Do NOT include any code block markers, explanations or extra text."
         )
+
+        
         messages = [{"role": "user", "content": prompt}]
         response = self.gpt.ask(messages)
-        print(f"Response from GPT: {response}")
+        print(f"Response from GPT: {response}") 
         return json.loads(response)
