@@ -1,13 +1,15 @@
 import asyncio
 from aiogram import Router
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from aiogram.filters import Command
 from aiogram.enums import ParseMode
 import tempfile
 import os
 import json
 
+from app.tg_bot.decorators.auth import require_auth
 from app.services.InvoiceExtractor.invoice_extractor import InvoiceExtractor
+from app.tg_bot.ui.messages import send_login_menu
 
 router = Router()
 OPENAI_API_KEY = os.getenv("OPENAI_KEY")
@@ -59,21 +61,24 @@ async def process_invoice_image(message: Message, file_id: str, bot):
         os.remove(tmp_path)
 
 # Handlers for commands and messages
-async def start_handler(message: Message):
-    await send_main_menu(message=message)
+async def start_handler(message: Message, **data):
+    auth_handler = data["auth_handler"]
+    await send_main_menu(message=message, auth_handler=auth_handler)
 
 async def get_id_handler(message: Message):
     user_id = message.from_user.id
     formatted_message = f"""Ваш Telegram ID: <code>{user_id}</code>"""
     await message.answer(formatted_message, parse_mode=ParseMode.HTML)
 
-async def handle_photo(message: Message):
+@require_auth()
+async def handle_photo(message: Message, **data):
     print(f"Received photo: {message.photo[-1].file_id}")
     photo = message.photo[-1]
     bot = message.bot
     await process_invoice_image(message, photo.file_id, bot)
 
-async def handle_document(message: Message):
+@require_auth()
+async def handle_document(message: Message, **data):
     document = message.document
     bot = message.bot
     if not document.mime_type.startswith("image/"):
@@ -82,15 +87,68 @@ async def handle_document(message: Message):
     await process_invoice_image(message, document.file_id, bot)
 
 
-async def send_main_menu(message:Message, is_new_mess:bool=True):
+@router.message(lambda msg: msg.web_app_data)
+async def handle_webapp_login(message: Message, **data):
+    auth_handler = data["auth_handler"]
+    try:
+        payload = json.loads(message.web_app_data.data)
+    except Exception as e:
+        await message.answer("❌ Дані авторизації некоректні.")
+        return
+
+    phone = payload.get("phone_number")
+    password = payload.get("password")
+    telegram_id = message.from_user.id
+
+    if not phone or not password:
+        await message.answer("❌ Введено не всі дані. Спробуйте ще раз.")
+        return
+
+    print(f"Web app login data: {payload}")
+
+    try:
+        success = auth_handler.login(telegram_id, phone, password)
+    except Exception as e:
+        success = None
+        await message.answer("❌ Щось пішло не так!", reply_markup=ReplyKeyboardRemove())
+        print(f"Login error: {e}")
+        return
+
+    if success:
+        await message.answer("✅ Ви успішно увійшли до кабінету!", reply_markup=ReplyKeyboardRemove())
+        
+    else:
+        await message.answer("❌ Невірний номер телефону або пароль.", reply_markup=ReplyKeyboardRemove())
+        await send_main_menu(message=message,  auth_handler=auth_handler)
+        
+
+async def send_main_menu(message:Message, is_new_mess:bool=True, auth_handler=None):
+
+    is_logged_in = None
+    
+    if auth_handler:
+        is_logged_in = auth_handler.is_logged_in(message.from_user.id)
+
+    buttons = [
+        [InlineKeyboardButton(text="Історія", callback_data="inDev")],
+        [InlineKeyboardButton(text="Деталі", callback_data="inDev")]
+    ]
+
+    if not is_logged_in:    
+        buttons.append(
+            [InlineKeyboardButton(text="🔐 Увійти в кабінет", callback_data=f"sendLoginBlock")]
+        )
+    else:
+        buttons.append(
+            [InlineKeyboardButton(text="🔐 Вийти з кабінету", callback_data=f"inDev")]
+        )
 
     menu_txt = f"😉 Вас вітає головне меню Бота\nТут ви можете отримати потрібну вам інформацію\n\n"
     keyboard = InlineKeyboardMarkup(
     row_width=2,
-    inline_keyboard=[
-            [InlineKeyboardButton(text="Історія", callback_data=f"inDev")],
-            [InlineKeyboardButton(text="Деталі", callback_data=f"inDev")]
-        ])
+    inline_keyboard=buttons)
+
+    
 
     if is_new_mess:
         await message.answer(menu_txt, reply_markup=keyboard, parse_mode=ParseMode.HTML)
@@ -105,6 +163,8 @@ async def procc_callback_handler(callback: CallbackQuery):
     code = callback_list[0]
     if code == "inDev":
         await callback.answer(text="Функція в розробці 🛠", show_alert=True)
+    if code == "sendLoginBlock":
+        await send_login_menu(callback.message)
 
 # Register the invoice processing handler
 router.message.register(start_handler, Command("start"))

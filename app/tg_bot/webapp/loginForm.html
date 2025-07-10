@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8">
+    <title>Вхід в кабінет</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+    body {
+      background-color: #f0f0f0;
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    h2 {
+      text-align: center;
+      color: #222;
+    }
+    input, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #2a9d8f;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+  </head>
+  <body>
+    <h2>Вхід в SmartKasa</h2>
+    <input type="text" id="phone" placeholder="Номер телефону">
+    <input type="password" id="password" placeholder="Пароль">
+    <button onclick="sendLogin()">Увійти</button>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+    function sendLogin() {
+      const WebApp = window.Telegram.WebApp;
+      const phone = document.getElementById("phone").value.trim();
+      const password = document.getElementById("password").value.trim();
+
+      if (!phone || !password) {
+        alert("Будь ласка, заповніть усі поля.");
+        return;
+      }
+
+      WebApp.sendData(JSON.stringify({
+        phone_number: phone,
+        password: password
+      }));
+      WebApp.close();
+    }
+  </script>
+  </body>
+</html>
